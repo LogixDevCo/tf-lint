@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       
       - name: Run Terraform Lint
-        uses: your-username/terraform-lint-action@v1
+        uses: tahadekmak/terraform-lint-action@v1
 ```
 
 ### With Custom Configuration
@@ -42,7 +42,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       
       - name: Run Terraform Lint
-        uses: your-username/terraform-lint-action@v1
+        uses: tahadekmak/terraform-lint-action@v1
         with:
           working-directory: './terraform'
           tflint-config: '.tflint.hcl'
@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       
       - name: Run Terraform Lint on ${{ matrix.directory }}
-        uses: your-username/terraform-lint-action@v1
+        uses: tahadekmak/terraform-lint-action@v1
         with:
           working-directory: ${{ matrix.directory }}
 ```
