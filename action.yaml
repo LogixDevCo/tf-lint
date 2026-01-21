@@ -1,0 +1,105 @@
+name: 'Terraform Lint'
+description: 'Runs TFLint on Terraform code and generates a detailed summary with annotations'
+author: 'TahaDekmak'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  working-directory:
+    description: 'Working directory to lint'
+    required: false
+    default: '.'
+  tflint-config:
+    description: 'Path to TFLint config file'
+    required: false
+    default: '.tflint.hcl'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
+      with:
+        terraform_version: 1.14.3
+
+    - name: Setup TFLint
+      uses: terraform-linters/setup-tflint@4cb9feea73331a35b422df102992a03a44a3bb33
+      with:
+        tflint_version: latest
+        github_token: ${{ github.token }}
+
+    - name: Show TFLint version
+      shell: bash
+      run: tflint --version
+
+    - name: Init TFLint
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ -f "${{ inputs.tflint-config }}" ]; then
+          tflint --init --config "${{ inputs.tflint-config }}"
+        else
+          tflint --init
+        fi
+
+    - name: Run TFLint
+      id: tflint
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set +e
+        if [ -f "${{ inputs.tflint-config }}" ]; then
+          tflint --format compact --config "${{ inputs.tflint-config }}" > tflint-output.txt 2>&1
+        else
+          tflint --format compact > tflint-output.txt 2>&1
+        fi
+        TFLINT_EXIT_CODE=$?
+        cat tflint-output.txt
+        echo "exit_code=$TFLINT_EXIT_CODE" >> $GITHUB_OUTPUT
+        exit 0
+
+    - name: Parse TFLint results and create summary
+      if: always()
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "# 🔍 Terraform Lint Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Working Directory:** \`${{ inputs.working-directory }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f tflint-output.txt ]; then
+          ISSUE_COUNT=$(grep -c "^" tflint-output.txt || echo "0")
+          if [ "$ISSUE_COUNT" -eq 0 ] || [ "${{ steps.tflint.outputs.exit_code }}" -eq 0 ]; then
+            echo "✅ No linting issues found!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## Issues Found" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            cat tflint-output.txt >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Parse compact format and create annotations
+            while IFS= read -r line; do
+              if [[ $line =~ ^([^:]+):([0-9]+):([0-9]+):[[:space:]]*(Error|Warning):[[:space:]]*(.+)$ ]]; then
+                file="${BASH_REMATCH[1]}"
+                line_num="${BASH_REMATCH[2]}"
+                severity="${BASH_REMATCH[4]}"
+                message="${BASH_REMATCH[5]}"
+                
+                if [ "$severity" = "Error" ]; then
+                  echo "::error file=$file,line=$line_num::$message"
+                else
+                  echo "::warning file=$file,line=$line_num::$message"
+                fi
+              fi
+            done < tflint-output.txt
+            
+            echo "Linting issues found, failing build..."
+            exit 1
+          fi
+        else
+          echo "⚠️ No output file found" >> $GITHUB_STEP_SUMMARY
+        fi
