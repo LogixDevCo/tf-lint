@@ -1,4 +1,4 @@
-name: 'Terraform Linter'
+name: 'LogixDev Terraform Linter'
 description: 'Runs TFLint on Terraform code and generates a detailed summary with annotations'
 author: 'TahaDekmak'
 branding:
